@@ -29,8 +29,8 @@ I built and deployed a comprehensive, locally hosted home lab to simulate a live
 
 For a detailed breakdown, configurations, and screenshots, click on the phases below:
 
-* **[Phase 1: Network & Boundary Setup](./phase1.md)** - OPNsense routing and LAN isolation.
-* **[Phase 2: Core Infrastructure](./Phase-2-Infrastructure.md)** - Provisioning Windows and Ubuntu VMs.
+* **[Phase 1: Network Architecture & Infrastructure Provisioning](./phase1.md)** - Firewall Setup and setting up machines.
+* **[Phase 2: Telemetry, SIEM, and Case Management](./phase2.md)** - Installing Wazuh, Sysmon, and the Hive.
 * **[Phase 3: SIEM Deployment](./Phase-3-SIEM.md)** - Installing Wazuh and deploying agents.
 * **[Phase 4: SOAR Integration](./Phase-4-SOAR.md)** - Connecting Shuffle and TheHive.
 * **[Phase 5: Attack Simulation](./Phase-5-Attack.md)** - Executing Kali Linux attacks and validating alerts.
