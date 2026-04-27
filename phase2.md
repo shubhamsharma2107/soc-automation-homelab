@@ -82,18 +82,23 @@ The Wazuh Agent establishes a secure, encrypted AES channel to forward endpoint 
     
 2.  **Execution:** Ran the command in PowerShell (Run as Administrator) on the target Windows VM to download and install the agent.
     ```powershell
-    
+    Invoke-WebRequest -Uri https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.4-1.msi -OutFile $env:tmp\wazuh-agent; msiexec.exe /i $env:tmp\wazuh-agent /q WAZUH_MANAGER='10.0.50.50' 
+    ```
     <img width="977" height="411" alt="Screenshot 2026-04-26 174402" src="https://github.com/user-attachments/assets/d03d67ff-1126-42e5-91be-4c4a10e05516" />
 
 4.  **Service Initialization:** We need now to start the Wazuh Service.
     ```powershell
     NET START Wazuh
     ```
-Follow the same steps for windows server and windows 10 machine.
+5.  On the Wazuh Dashboard we should see our machine online and information about it.
+
+   <img width="1617" height="879" alt="image" src="https://github.com/user-attachments/assets/5f978082-aaa3-459b-8485-ae27fcdd53e6" />
+
+6.  Follow the same steps for windows server and windows 10 machine.
 
 ---
 
-## 4. Engineering the Telemetry Pipeline
+## 4. Setting up Forwarding Sysmon Logs to Wazuh
 
 By default, Wazuh does not monitor the Sysmon event channel. The local configuration must be modified to bridge this gap.
 
@@ -111,11 +116,11 @@ By default, Wazuh does not monitor the Sysmon event channel. The local configura
     ```powershell
     Restart-Service -Name wazuh
     ```
-4. Verify on Wazuh Dashboard if if wazuh agenbt is usccesffully sending sysmon events.
+4. Verify on Wazuh Dashboard if if wazuh agent is succesffully sending sysmon events.
+   
+    <img width="1622" height="914" alt="image" src="https://github.com/user-attachments/assets/f00f71e2-1267-451a-941c-1a625a15f76d" />
 
-
-
-5. Follow same stepos for Windows 10 and Windows Server Machine.
+5. Follow same steps for Windows 10 and Windows Server Machine.
 
 ---
 
@@ -134,14 +139,3 @@ To elevate this lab from just "detecting" to actual "responding," I deployed **T
 
 ---
 
-## 6. Verification & SOC Visualization
-
-With the infrastructure online, I verified the telemetry flow within the Wazuh **Security Events** module.
-
-- **Query Executed:** `data.source: "Microsoft-Windows-Sysmon/Operational"`
-- **Result:** Successful ingestion of deep system internals, including:
-  - Parent-child process relationships
-  - Network callbacks
-  - File hash (SHA256) logging
-
-*This project is part of my ongoing preparation for the **SC-200: Microsoft Security Operations Analyst** certification, demonstrating practical application of SIEM engineering and incident response tooling.*
