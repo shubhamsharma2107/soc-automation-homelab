@@ -13,7 +13,7 @@ I built and deployed a comprehensive, locally hosted home lab to simulate a live
 * **Target Endpoints:** Windows Server 2025, Windows 11, Windows 10
 * **Attacker Machine:** Kali Linux (2025.4)
 
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/d489bee1-d07b-4bd9-aa30-8bbf79b0ec3c" />
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/7ef9ad5c-0320-471e-8f38-d0b265d115d8" />
 
 <img width="616" height="610" alt="image" src="https://github.com/user-attachments/assets/394396c2-e71d-4c3b-a4ce-ea13ec449c63" />
 
