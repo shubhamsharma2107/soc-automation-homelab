@@ -128,14 +128,133 @@ By default, Wazuh does not monitor the Sysmon event channel. The local configura
 
 To elevate this lab from just "detecting" to actual "responding," I deployed **TheHive** to act as the primary SOC ticketing and case management system.
 
-### Docker Deployment Steps:
-1. **Install Prerequisites:** Ensure Docker and Docker Compose are installed on the Linux host.
-2. **Compose Configuration:** Created a `docker-compose.yml` file configuring TheHive alongside Cassandra and Elasticsearch (its backend dependencies).
-3. **Container Initialization:**
-    ```bash
-    docker-compose up -d
-    ```
-4. **Access Verification:** Reached TheHive web interface via `http://<Ubuntu_IP>:9000` to establish the initial administrator account and organization setup.
+---
+
+### Step 1 — Update System & Install Dependencies
+
+Update your system, install basic dependencies, then install Java:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install wget gnupg apt-transport-https software-properties-common -y
+sudo apt install openjdk-11-jre-headless -y
+java -version
+```
 
 ---
 
+### Step 2 — Install & Configure Apache Cassandra
+
+Add the Cassandra repository and GPG key, then install:
+
+```bash
+wget -qO - https://downloads.apache.org/cassandra/KEYS | sudo gpg --dearmor -o /usr/share/keyrings/cassandra-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/cassandra-archive-keyring.gpg] https://debian.cassandra.apache.org 41x main" | sudo tee /etc/apt/sources.list.d/cassandra.list
+sudo apt update
+sudo apt install cassandra -y
+```
+
+#### Configure the Cluster Name
+
+TheHive expects a specific cluster name. Open the config file:
+
+```bash
+sudo nano /etc/cassandra/cassandra.yaml
+```
+
+Locate `cluster_name` and update it:
+
+```yaml
+cluster_name: 'TheHive'
+```
+
+Save and exit: `Ctrl+O` → `Enter` → `Ctrl+X`
+
+#### Reset & Initialize the Database
+
+Because the cluster name was changed after installation, the existing system data must be cleared to prevent conflicts:
+
+```bash
+sudo systemctl stop cassandra
+sudo rm -rf /var/lib/cassandra/*
+sudo systemctl start cassandra
+sudo systemctl enable cassandra
+```
+
+---
+
+### Step 3 — Install & Configure Elasticsearch
+
+Add the Elasticsearch repository and GPG key, then install:
+
+```bash
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-7.x.list
+sudo apt update
+sudo apt install elasticsearch -y
+```
+
+#### Configure Elasticsearch
+
+Open the config file:
+
+```bash
+sudo nano /etc/elasticsearch/elasticsearch.yml
+```
+
+Apply the following settings:
+
+```yaml
+cluster.name: thehive
+node.name: node-1
+network.host: 127.0.0.1
+http.port: 9200
+discovery.type: single-node
+```
+
+Save and exit: `Ctrl+O` → `Enter` → `Ctrl+X`
+
+Start and enable the service:
+
+```bash
+sudo systemctl restart elasticsearch
+sudo systemctl enable elasticsearch
+```
+
+---
+
+### Step 4 — Install & Start TheHive
+
+Download and install the package:
+
+```bash
+wget -O /tmp/thehive_5.7.2-1_all.deb https://thehive.download.strangebee.com/5.7/deb/thehive_5.7.2-1_all.deb
+sudo apt-get install /tmp/thehive_5.7.2-1_all.deb
+```
+
+Start and enable the service:
+
+```bash
+sudo systemctl start thehive
+sudo systemctl enable thehive
+```
+
+---
+
+### Step 5 — Verify All Services
+
+Ensure all three components are actively running without errors:
+
+```bash
+sudo systemctl status cassandra elasticsearch thehive
+```
+
+---
+
+### Step 6 — Access the Web Interface
+
+Open your browser and navigate to: http://<YOUR_SERVER_IP>:9000
+
+Log in with the default credentials: Username: `admin@thehive.local` & Password:`secret`
+
+<img width="1370" height="1138" alt="image" src="https://github.com/user-attachments/assets/cfc7236c-1972-416c-be04-eb55c618c3bb" />
