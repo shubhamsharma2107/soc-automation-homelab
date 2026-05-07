@@ -55,14 +55,6 @@ Navigate to the **Apps** section. By default, only a limited number of apps are 
 
 <img width="1524" height="805" alt="Selecting Force Update to refresh the app library" src="https://github.com/user-attachments/assets/3fad08a1-ecbb-4134-b88d-a3c94fcf7149" />
 
-After the update, **VirusTotal** may not appear in your app list automatically. To add it:
-
-1. Go to **Apps → Discover Public Apps**
-2. Search for `VirusTotal`
-3. Click **Activate** to add it to your organization's app library
-
-<img width="1543" height="822" alt="Searching for and activating VirusTotal in public apps" src="https://github.com/user-attachments/assets/f29aabbb-9f5f-4768-99d9-ce56c3f04bdb" />
-
 ---
 
 ### Step 3 — Build the Automation Workflow
@@ -140,34 +132,90 @@ Back in Shuffle, confirm the workflow was triggered and the alert data was recei
 
 #### Node 2 — Extract the SHA256 Hash
 
-With the alert data flowing into Shuffle, the next step is to isolate the file hash for threat intelligence lookup. Add a **Regex Capture Group** node and set the input to:
+With alert data flowing into Shuffle, the next step is to isolate the SHA256 file hash to use for threat intelligence lookup.
+
+Add a **Regex Capture Group** node and set the input to the hashes field from the Wazuh alert:
 
 ```
 $exec.text.win.eventdata.hashes
 ```
 
-<img width="1541" height="819" alt="Configuring the execution argument to extract the hashes field" src="https://github.com/user-attachments/assets/fe34552d-7a15-45e6-a6e9-6a49b6da15ae" />
+<img width="1541" height="819" alt="Configuring the input field to point to the Wazuh hashes event data" src="https://github.com/user-attachments/assets/fe34552d-7a15-45e6-a6e9-6a49b6da15ae" />
 
-<img width="1535" height="820" alt="Hash value extracted from the Wazuh alert payload" src="https://github.com/user-attachments/assets/8e9b6353-8c83-4bda-9da1-8fbe7060a2ab" />
+<img width="1535" height="820" alt="Raw hash value extracted from the incoming Wazuh alert payload" src="https://github.com/user-attachments/assets/8e9b6353-8c83-4bda-9da1-8fbe7060a2ab" />
 
-Since Wazuh forwards hashes in a combined format (e.g. `SHA1=...,MD5=...,SHA256=...`), apply the following regex to extract only the SHA256 value:
+Wazuh forwards process hashes in a combined format, for example:
 
-```regex
-SHA256=([A-Fa-f0-9]{64})
+```
+SHA1=abc123...,MD5=def456...,SHA256=a1b2c3...
 ```
 
-<img width="1537" height="821" alt="Regex pattern configured to capture the SHA256 hash from the hashes field" src="https://github.com/user-attachments/assets/0fec5630-9f1e-4a68-91f9-60b72f6333ca" />
+To extract only the SHA256 value, apply the following regex pattern in the capture group:
 
-This will output a clean 64-character SHA256 hash, ready to be passed into the VirusTotal lookup node.
+```regex
+(?i)sha256=([A-Fa-f0-9]{64})
+```
+
+The `(?i)` flag makes the match case-insensitive, and the capture group `([A-Fa-f0-9]{64})` isolates exactly the 64-character hex hash, stripping the `SHA256=` prefix entirely.
+
+<img width="1542" height="823" alt="Regex pattern configured to capture only the SHA256 hash value" src="https://github.com/user-attachments/assets/bc07b4c6-06c8-4f25-96c3-39a735e81488" />
+
+Rename the node to something descriptive like `Extract_SHA256` for better visibility in the workflow canvas, then **save** the workflow and **run** it:
+
+<img width="1539" height="824" alt="Node renamed to Extract_SHA256 for clarity in the workflow canvas" src="https://github.com/user-attachments/assets/17eeea27-2bf7-480d-a611-45ec1fb681c9" />
+
+If configured correctly, the node will output a clean, isolated SHA256 hash ready to be passed directly into the VirusTotal lookup node:
+
+<img width="1542" height="824" alt="Clean SHA256 hash successfully extracted and ready for VirusTotal lookup" src="https://github.com/user-attachments/assets/24a8f382-f259-4d68-b5d8-061959aa1128" />
+
 
 #### Node 3 — VirusTotal Hash Lookup
 
-1. Add the **VirusTotal** app from the Shuffle app library
-2. Connect your VirusTotal API key under app authentication
-3. Set the action to **Get Hash Report**
-4. Pass in the extracted hash from Node 2
+The native VirusTotal app in Shuffle was not functioning as expected, so as a workaround an **HTTP node** was added to make direct API calls to VirusTotal instead. Rename the node to `VirusTotal` for clarity in the workflow canvas:
 
-Shuffle will query VirusTotal and return the detection ratio and threat verdict for the hash.
+<img width="1541" height="821" alt="HTTP node added and renamed to VirusTotal in the workflow canvas" src="https://github.com/user-attachments/assets/0a4bdce1-bb60-484d-84ce-7e5b20b199d9" />
+
+---
+
+#### Configure the HTTP Node
+
+Set the **Action** to `GET` and paste the following URL, which passes the extracted SHA256 hash from the previous node directly into the VirusTotal Files API endpoint:
+
+```
+https://www.virustotal.com/api/v3/files/$sha256-hash.group_0.#
+```
+
+<img width="1537" height="821" alt="HTTP GET request configured with the VirusTotal API URL and SHA256 hash variable" src="https://github.com/user-attachments/assets/8b0fb465-411e-4550-8cad-8068708ae20e" />
+
+---
+
+#### Add the VirusTotal API Key
+
+VirusTotal requires authentication for all API requests. To get your API key:
+
+1. Create a free account at [virustotal.com](https://www.virustotal.com)
+2. Navigate to your **Profile → API Key**
+3. Copy the key
+
+Back in the HTTP node, expand **Optional Parameters → Headers** and add the following:
+
+x-apikey:YOUR API KEY
+
+<img width="1539" height="820" alt="VirusTotal API key added as x-apikey header in the HTTP node configuration" src="https://github.com/user-attachments/assets/08e429a3-1ec8-4144-9bb4-a5812db17224" />
+
+---
+
+#### Run & Verify
+
+Save the workflow and run it again. A successful response will return a `200 OK` status, confirming that Shuffle has successfully queried VirusTotal with the extracted hash:
+
+<img width="1538" height="817" alt="Workflow execution showing 200 OK response from the VirusTotal API" src="https://github.com/user-attachments/assets/75712ac6-402e-4d4c-9e36-532537e619ff" />
+
+> ✅ A `200` status confirms the VirusTotal lookup is working correctly and the hash data is being returned for the next stage of the pipeline.
+
+When checking attributes we can its identifrd malicious by 63 Secuirty Scanners.
+<img width="1540" height="819" alt="image" src="https://github.com/user-attachments/assets/4d572580-3643-4950-b16d-5872d07c14cc" />
+
 
 #### Node 4 — Create a Case in TheHive
 
@@ -185,51 +233,60 @@ Shuffle will query VirusTotal and return the detection ratio and threat verdict 
 
 #### Node 5 — Discord Notification
 
-1. Add the **Discord** app or use an **HTTP** node with your Discord webhook URL
-2. Set up a Discord webhook in your server under **Server Settings → Integrations → Webhooks**
-3. Copy the webhook URL and paste it into Shuffle
-4. Set the action to **Send Message** with a message body such as:
+#### Set Up the Discord Webhook
+
+In Discord, set up a dedicated alert channel and webhook by following these steps:
+
+1. Create or open your Discord server
+2. Create a text channel named `#soc-alerts`
+3. Click the **gear icon** on the channel to open **Channel Settings**
+4. Navigate to **Integrations → Webhooks → New Webhook**
+5. Name it `Shuffle Automation`
+6. Click **Copy Webhook URL** then hit **Save**
+
+---
+
+#### Configure the Discord Node in Shuffle
+
+Add the **Discord** node to your workflow and configure it as follows:
+
+| Field | Value |
+|-------|-------|
+| Action | `POST - Send a Message` |
+| Webhook URL | Paste the URL copied from Discord |
+| Body | See below |
+
+Paste the following JSON into the **Body** field:
+
+```json
+{
+  "content": "🚨 **Mimikatz Alert Detected**\n\n🖥️ **Host:** $exec.text.win.system.computer\n🔎 **Hash:** $sha256_hash.group_0.#\n🦠 **VirusTotal (Malicious):** $virustotal.#.body.data.attributes.last_analysis_stats.malicious\n📋 **TheHive Case:** Created Successfully\n⏰ **Time:** $exec.text.win.eventdata.utcTime"
+}
+```
+
+<img width="1541" height="825" alt="Discord node configured in Shuffle with webhook URL and alert message body" src="https://github.com/user-attachments/assets/d69db864-b45f-415e-b673-7df40a0dfcb3" />
+
+---
+
+#### Test & Verify
+
+Save the workflow and click **Test Action**. If everything is configured correctly, an alert message will appear in your `#soc-alerts` Discord channel within seconds:
+
+<img width="1265" height="619" alt="image" src="https://github.com/user-attachments/assets/316a6638-2794-40d9-ae50-dba83cbb2226" />
+
+The message will look like this:
 
 ```
-🚨 *Mimikatz Alert Detected*
+🚨 Mimikatz Alert Detected
 
-🖥️ Host: $exec.text.agent.name
-🔎 Hash: $exec.text.win.eventdata.hashes
-🦠 VirusTotal: $virustotal.data.attributes.last_analysis_stats.malicious detections
+🖥️ Host: DESKTOP-WIN10
+🔎 Hash: a1b2c3d4e5f6...
+🦠 VirusTotal (Malicious): 65
 📋 TheHive Case: Created Successfully
-⏰ Time: $exec.text.timestamp
+⏰ Time: 2025-01-15 14:32:10
 ```
 
----
-
-### Step 3 — Connect Wazuh to Shuffle
-
-On the Wazuh manager, edit `ossec.conf` to forward alerts to the Shuffle webhook:
-
-```bash
-sudo nano /var/ossec/etc/ossec.conf
-```
-
-Add the following integration block:
-
-```xml
-<integration>
-  <name>shuffle</name>
-  <hook_url>http://<SHUFFLE_IP>:3001/api/v1/hooks/<YOUR_WEBHOOK_ID></hook_url>
-  <rule_id>100002</rule_id>
-  <alert_format>json</alert_format>
-</integration>
-```
-
-> Replace `<SHUFFLE_IP>` and `<YOUR_WEBHOOK_ID>` with your actual values. `rule_id` should match the custom Mimikatz rule created earlier.
-
-Restart the Wazuh manager to apply changes:
-
-```bash
-sudo systemctl restart wazuh-manager
-```
-
----
+> ✅ A message appearing in Discord confirms the full automation pipeline is working end to end — from Mimikatz execution on the Windows machine, through Wazuh detection, Shuffle orchestration, VirusTotal enrichment, all the way to analyst notification.
 
 ### Step 4 — Test the Full Pipeline
 
