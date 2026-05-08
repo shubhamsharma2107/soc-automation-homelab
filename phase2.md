@@ -258,3 +258,10 @@ Open your browser and navigate to: http://<YOUR_SERVER_IP>:9000
 Log in with the default credentials: Username: `admin@thehive.local` & Password:`secret`
 
 <img width="1370" height="1138" alt="image" src="https://github.com/user-attachments/assets/cfc7236c-1972-416c-be04-eb55c618c3bb" />
+
+---
+<div align="center">
+
+[← Previous: Phase 1 — Network Architecture](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase1.md) &nbsp;&nbsp;&nbsp;&nbsp; [Next: Phase 3 — Mimikatz & Wazuh Detections →](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase3.md)
+
+</div>
