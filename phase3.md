@@ -101,3 +101,9 @@ If our rule had relied solely on the `Image` field (the file path/name on disk),
 <img width="1541" alt="Alert details showing originalFileName match" src="https://github.com/user-attachments/assets/b818c46b-7386-4547-94f6-4705477a6782" />
 <img width="1545" height="823" alt="image" src="https://github.com/user-attachments/assets/8886302b-7295-4425-ba31-3801c35b8bab" />
 
+---
+<div align="center">
+
+[← Previous: Phase 2 — Telemetry, SIEM & Case Management](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase2.md) &nbsp;&nbsp;&nbsp;&nbsp; [Next: Phase 4 — SOAR Integration →](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase4.md)
+
+</div>
