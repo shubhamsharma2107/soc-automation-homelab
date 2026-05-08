@@ -1,4 +1,4 @@
-## Phase 4: SOAR Automation with Shuffle & Discord Notifications
+## Phase 4: SOAR Integration & Automation
 
 With detection and case management in place, the final phase focuses on **automation and alerting**. We will deploy **Shuffle** as our SOAR (Security Orchestration, Automation and Response) platform to build an automated workflow that:
 
