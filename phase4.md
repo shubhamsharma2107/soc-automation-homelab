@@ -380,3 +380,10 @@ If everything is configured correctly, within seconds of Mimikatz executing you 
 > 🔎 Hash: `abc123...`
 > 🦠 VirusTotal: `65/72 malicious detections`
 > 📋 TheHive Case: Created Successfully
+
+---
+<div align="left">
+
+[← Previous: Phase 3 — Mimikatz & Wazuh Detections](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase3.md)
+
+</div>
