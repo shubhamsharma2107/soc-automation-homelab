@@ -217,19 +217,95 @@ When checking attributes we can its identifrd malicious by 63 Secuirty Scanners.
 <img width="1540" height="819" alt="image" src="https://github.com/user-attachments/assets/4d572580-3643-4950-b16d-5872d07c14cc" />
 
 
-#### Node 4 — Create a Case in TheHive
+#### Node 4 — Create an Alert in TheHive
 
-1. Add the **TheHive** app
-2. Authenticate using your TheHive URL and API key
-3. Set the action to **Create Alert** or **Create Case**
-4. Map the following fields from the Wazuh alert:
+Before configuring the Shuffle node, TheHive needs to be set up with an organization, a user account, and a service account API key that Shuffle will use to authenticate.
 
-| TheHive Field | Wazuh Source |
-|---------------|--------------|
-| Title | `Mimikatz Detected on $exec.text.agent.name` |
-| Severity | High |
-| Description | Alert timestamp, agent name, file hash |
-| Tags | `mimikatz`, `credential-dumping` |
+---
+
+#### Set Up TheHive Organization & Users
+
+Log into TheHive using the default admin credentials and create a new organization:
+
+<img width="1345" height="730" alt="Creating a new organization in TheHive as the admin" src="https://github.com/user-attachments/assets/7993af79-7fa2-48ad-b1cb-9e4f6b4acd2d" />
+
+<img width="1346" height="732" alt="New organization successfully created in TheHive" src="https://github.com/user-attachments/assets/6434506a-42b8-44da-abd4-0905b73a17d0" />
+
+Click on the newly created organization and create a regular user account (e.g. `Alice Smith`) — this will be the analyst account used to review alerts:
+
+<img width="1343" height="730" alt="Creating analyst user account Alice Smith inside the organization" src="https://github.com/user-attachments/assets/92ba2504-9569-4e9f-b6aa-0f74eba0f98d" />
+
+<img width="1343" height="728" alt="Alice Smith user account created successfully" src="https://github.com/user-attachments/assets/c885dc55-10b6-4240-a165-7ecb5b7e7b55" />
+
+---
+
+#### Create a Service Account for Shuffle
+
+Next, create a dedicated **service account** for Shuffle to use when communicating with TheHive. Using a separate service account is best practice — it keeps automation credentials isolated from analyst accounts:
+
+<img width="1344" height="770" alt="Adding a SOAR service account to the organization" src="https://github.com/user-attachments/assets/5fc545f4-570e-49e1-a8d1-5be1e5287965" />
+
+<img width="1342" height="725" alt="SOAR service account created in TheHive" src="https://github.com/user-attachments/assets/a5e43f9f-734c-4bf3-ab92-ea5b42250fa6" />
+
+Set a password for the Alice analyst account, then switch to the SOAR service account and **generate an API key** — this is what Shuffle will use to authenticate with TheHive:
+
+<img width="1344" height="681" alt="Setting a password for the Alice Smith analyst account" src="https://github.com/user-attachments/assets/8f9d114a-7d0d-47d3-9720-1d8cb0bbe813" />
+
+<img width="1343" height="728" alt="Generating an API key for the SOAR service account" src="https://github.com/user-attachments/assets/6fb64e0d-d193-4fa8-9fdd-a602e4881c42" />
+
+<img width="1344" height="768" alt="API key generated and ready to copy for Shuffle integration" src="https://github.com/user-attachments/assets/5d5561a3-9903-4c3a-8450-61ae360b7c90" />
+
+> 📋 Copy the API key now and store it safely — it will only be shown once and is needed in the next step.
+
+---
+
+#### Configure TheHive Node in Shuffle
+
+Back in Shuffle, add the **TheHive** node to the workflow and authenticate it using the TheHive URL and the API key generated above:
+
+<img width="1343" height="772" alt="TheHive node added to the Shuffle workflow" src="https://github.com/user-attachments/assets/c32522a8-5919-406a-b53a-22824c224a3c" />
+
+<img width="1344" height="713" alt="TheHive node authenticated with the SOAR service account API key" src="https://github.com/user-attachments/assets/5ed8e821-6546-466c-8720-501af4f4e780" />
+
+In the **Configuration** tab, switch to the **Advanced** view and paste the following JSON directly. This saves time compared to filling in each field individually and ensures all alert fields are populated correctly:
+
+```json
+{
+  "description": "Mimikatz Detected on host:$exec.text.win.system.computer",
+  "externallink": "https://attack.mitre.org/techniques/T1003/",
+  "flag": false,
+  "pap": 2,
+  "severity": 2,
+  "source": "$exec.pretext",
+  "sourceRef": "$exec.rule_id-$exec.text.win.eventdata.utcTime",
+  "status": "New",
+  "summary": "Mimikatz activity detected on host:$exec.text.win.system.computer and Process ID:$exec.all_fields.full_log.win.system.processID and the process command line:$exec.all_fields.full_log.win.eventdata.commandLine and user is $exec.all_fields.data.win.eventdata.user",
+  "tags": [
+    "T1003"
+  ],
+  "title": "$exec.title",
+  "tlp": 2,
+  "type": "internal"
+}
+```
+
+<img width="1342" height="769" alt="TheHive alert JSON pasted into the Advanced configuration tab in Shuffle" src="https://github.com/user-attachments/assets/becec737-d575-425e-b2ed-93debcb02f09" />
+
+---
+
+#### Run & Verify
+
+Save the workflow and run it. A green success status on the TheHive node confirms the alert was created successfully:
+
+<img width="1332" height="770" alt="Shuffle workflow executed successfully with TheHive node returning a success status" src="https://github.com/user-attachments/assets/dd9fba47-b515-4043-969a-4ecbe9862099" />
+
+Now log into TheHive using the **Alice Smith** analyst account created earlier and navigate to **Alerts** to confirm the case has appeared:
+
+<img width="1342" height="728" alt="Logging into TheHive as analyst Alice Smith" src="https://github.com/user-attachments/assets/bfedfb87-1527-436a-817a-a914a942d54d" />
+
+<img width="1338" height="728" alt="Mimikatz alert visible in TheHive under the analyst account" src="https://github.com/user-attachments/assets/019840df-a3c1-4870-a0ea-0bb2f7c79095" />
+
+> ✅ The alert appearing in TheHive confirms that the Shuffle → TheHive integration is fully operational. Analysts can now triage, investigate, and respond to Mimikatz detections directly from the case management platform.
 
 #### Node 5 — Discord Notification
 
