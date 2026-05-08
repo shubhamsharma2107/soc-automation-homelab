@@ -90,3 +90,10 @@ The adversary machine provides a controlled platform for simulating threat actor
 ---
 
 > **📝 Architectural Note:** > All virtual machines deployed in VirtualBox have their network adapters set strictly to the `Internal Network`. All traffic is forced through the OPNsense firewall, ensuring there is no direct connection to the host machine or the external internet. Additionally, because DNS and DHCP are handled centrally by the Windows Server DC, any new machine introduced to this environment will automatically receive a valid IP and be subject to the lab's centralized routing and security policies.
+
+---
+<div align="right">
+
+[Next: Phase 2 — Telemetry, SIEM & Case Management →](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase2.md)
+
+</div>
