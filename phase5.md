@@ -23,7 +23,7 @@ Windows Event ID 4625 → Wazuh Rule 60204 fires
         ↓
 Custom Rule 100005 triggers after threshold crossed
         ↓
-Shuffle receives alert → AbuseIPDB IP lookup
+Shuffle receives alert → VirusTotal IP lookup
         ↓
 Discord → Analyst YES / NO decision
         ↓
@@ -277,3 +277,396 @@ Wazuh dashboard alongside rule 60204:
 > force attack and is ready to forward the alert to Shuffle for automated
 > response. The next step is building the Shuffle workflow to handle the
 > analyst decision and OPNsense block.
+
+
+### Building the Shuffle Workflow
+
+#### Step 1 — Create the Workflow
+
+In the Shuffle dashboard click **Workflows → New Workflow** and configure:
+
+| Field | Value |
+|-------|-------|
+| Name | `RDP-BruteForce-Response` |
+| Description | `Automated RDP brute force detection and analyst-driven IP blocking` |
+
+<img width="678" height="477" alt="New RDP-BruteForce-Response workflow created in Shuffle dashboard" src="https://github.com/user-attachments/assets/6e2842ab-e147-4aa6-9297-de0ff67e7f08" />
+
+---
+
+#### Step 2 — Build the Initial Node Chain
+
+Add the first three nodes and connect them in sequence on the workflow canvas:
+
+1. **Webhook** — entry point that receives Wazuh alerts
+2. **Repeat Back to Me** — extracts the attacker IP from the alert payload
+3. **HTTP node** (renamed to `VirusTotal`) — queries VirusTotal for IP reputation
+
+> For detailed steps on configuring the HTTP node as a VirusTotal integration
+> refer to the [Phase 4 setup steps](./Phase-4-SOAR.md). The configuration here
+> is identical — just rename the node to `VirusTotal`.
+
+Once all three nodes are connected and saved the workflow canvas should look
+like this:
+
+<img width="1788" height="960" alt="Shuffle workflow showing Webhook, Repeat Back to Me, and VirusTotal HTTP nodes connected in sequence" src="https://github.com/user-attachments/assets/1ccdfef8-9679-4284-9051-82e01a602afc" />
+
+---
+
+#### Step 3 — Configure Each Node
+
+Three things need to be configured before running the workflow:
+
+---
+
+##### 3a — Activate the Webhook & Connect Wazuh
+
+Click the **Webhook** node and hit **Start Webhook** to activate it. Copy
+the generated webhook URL:
+
+<img width="1790" height="960" alt="Webhook node activated in Shuffle showing the generated webhook URL to copy" src="https://github.com/user-attachments/assets/644ca0cf-6f2f-4eda-90e3-119de472ede1" />
+
+On the Wazuh manager open `ossec.conf` and add a new integration block for
+this workflow alongside the existing Mimikatz integration:
+
+```bash
+sudo nano /var/ossec/etc/ossec.conf
+```
+
+```xml
+<!-- RDP Brute Force → Shuffle Webhook -->
+<integration>
+  <name>shuffle</name>
+  <hook_url>http://<SHUFFLE_IP>:3001/api/v1/hooks/<YOUR_WEBHOOK_ID></hook_url>
+  <rule_id>100005</rule_id>
+  <alert_format>json</alert_format>
+</integration>
+```
+
+<img width="823" height="584" alt="Shuffle integration block added to Wazuh ossec.conf for rule 100005" src="https://github.com/user-attachments/assets/17985f4b-2eba-457b-80da-745333f70f10" />
+
+Restart Wazuh to apply the changes:
+
+```bash
+sudo systemctl restart wazuh-manager
+```
+
+---
+
+##### 3b — Configure the Repeat Back to Me Node (Extract Attacker IP)
+
+Click the **Repeat Back to Me** node and paste the following into the
+**Call** field to extract the attacker IP directly from the Wazuh alert payload:
+
+```
+$exec.text.win.eventdata.ipAddress
+```
+
+<img width="1790" height="958" alt="Repeat Back to Me node configured with ipAddress field to extract attacker IP from alert" src="https://github.com/user-attachments/assets/01b07db7-5a5a-46fd-a51e-2d28e42a06cf" />
+
+---
+
+##### 3c — Configure the VirusTotal HTTP Node
+
+Click the **VirusTotal** HTTP node and set:
+
+| Field | Value |
+|-------|-------|
+| Action | `GET` |
+| URL | `https://www.virustotal.com/api/v3/ip_addresses/$exec.text.win.eventdata.ipAddress` |
+
+Under **Headers** add:
+
+| Header | Value |
+|--------|-------|
+| `x-apikey` | `YOUR_VIRUSTOTAL_API_KEY` |
+
+<img width="1790" height="959" alt="VirusTotal HTTP node configured with IP reputation API URL using extracted attacker IP variable" src="https://github.com/user-attachments/assets/e8760493-8919-48d5-9af2-1ada8713b466" />
+
+---
+
+#### Step 4 — Verify the Pipeline is Working
+
+Save the workflow and run Hydra from Kali to trigger rule `100005` and confirm
+data is flowing through all three nodes correctly:
+
+```bash
+hydra -l Administrator -P /usr/share/wordlists/fasttrack.txt rdp://10.0.2.15 -V -t 4
+```
+
+In Shuffle click **Show Execution Results** on each node and verify:
+
+- ✅ **Webhook** — Wazuh alert JSON payload received
+- ✅ **Repeat Back to Me** — Attacker IP `10.0.2.3` extracted cleanly
+- ✅ **VirusTotal** — `200` status returned with IP reputation data
+
+<img width="1791" height="962" alt="Shuffle workflow execution results showing successful data flow through all three nodes with 200 status from VirusTotal" src="https://github.com/user-attachments/assets/f29604eb-ce54-473d-ad4a-e83d689c26ec" />
+
+> **Note:** Since `10.0.2.3` is a private/internal IP address, VirusTotal will
+> return a clean or inconclusive result — this is expected. In a real-world
+> scenario where the attacker is coming from a public IP, VirusTotal would
+> return meaningful threat intelligence including malicious detection counts,
+> known associations, and geographic data. The integration is working correctly
+> regardless of the result for private IPs.
+
+---
+
+### Step 7 — Discord Alert to Analyst
+
+Add an **HTTP** node to send the enriched alert to Discord and notify the
+analyst of the detected brute force:
+
+1. Add an **HTTP** node
+2. Connect **VirusTotal_Lookup → Discord_Alert**
+3. Rename it `Discord_Alert`
+4. Configure it:
+
+| Field | Value |
+|-------|-------|
+| Action | `POST` |
+| URL | `YOUR_DISCORD_WEBHOOK_URL` |
+| Content-Type | `application/json` |
+
+Paste the following in the **Body** field:
+
+```json
+{
+  "content": "🚨 **RDP Brute Force Detected**\n\n🖥️ **Target Host:** $exec.text.agent.name\n🌐 **Attacker IP:** $Extract_Attacker_IP.#\n🔁 **Failed Attempts:** $exec.text.rule.firedtimes\n🌍 **Country:** $VirusTotal_Lookup.#.body.data.attributes.country\n🦠 **Malicious Detections:** $VirusTotal_Lookup.#.body.data.attributes.last_analysis_stats.malicious\n🔒 **ASN:** $VirusTotal_Lookup.#.body.data.attributes.asn\n⏰ **Time:** $exec.text.timestamp\n\n**Do you want to block this IP at the OPNsense firewall?**"
+}
+```
+
+<img width="" height="" alt="Discord HTTP node configured with enriched RDP brute force alert message body" src="YOUR_IMAGE_URL" />
+
+---
+
+### Step 8 — Analyst Decision (User Input Node)
+
+Add a **User Input** node to pause the workflow and wait for the analyst to
+make a block or investigate decision:
+
+1. Click **Triggers** on the left panel
+2. Drag **User Input** onto the canvas
+3. Connect **Discord_Alert → Analyst_Decision**
+4. Rename it `Analyst_Decision`
+5. Configure it:
+
+| Field | Value |
+|-------|-------|
+| Input Type | `Yes / No` |
+| Timeout | `3600` (1 hour) |
+
+Set the **Information** field to:
+
+```
+🚨 RDP Brute Force Detected
+
+🖥️ Target Host: $exec.text.agent.name
+🌐 Attacker IP: $Extract_Attacker_IP.#
+🦠 Malicious Detections: $VirusTotal_Lookup.#.body.data.attributes.last_analysis_stats.malicious
+🌍 Country: $VirusTotal_Lookup.#.body.data.attributes.country
+🔁 Failed Attempts: $exec.text.rule.firedtimes
+⏰ Time: $exec.text.timestamp
+
+Do you want to block this IP at the OPNsense firewall?
+```
+
+<img width="" height="" alt="User Input node configured with Yes/No analyst decision and enriched alert context" src="YOUR_IMAGE_URL" />
+
+> The workflow will pause here and wait up to 1 hour for the analyst to respond.
+> The analyst receives the Discord message and clicks Yes or No directly in
+> the Shuffle interface.
+
+---
+
+### Step 9 — YES Branch: Block IP at OPNsense
+
+#### Node A — Add IP to OPNsense Blocklist
+
+1. Add an **HTTP** node
+2. Connect **Analyst_Decision (Yes) → Block_IP_OPNsense**
+3. Rename it `Block_IP_OPNsense`
+4. Configure it:
+
+| Field | Value |
+|-------|-------|
+| Action | `POST` |
+| URL | `https://<OPNSENSE_IP>/api/firewall/alias/addHost/shuffle_blocklist` |
+
+Under **Headers** add:
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Basic <BASE64_KEY:SECRET>` |
+| `Content-Type` | `application/json` |
+
+> To generate your Base64 encoded credentials run:
+> ```bash
+> echo -n "YOUR_API_KEY:YOUR_API_SECRET" | base64
+> ```
+
+Body:
+
+```json
+{
+  "address": "$Extract_Attacker_IP.#"
+}
+```
+
+<img width="" height="" alt="HTTP node configured to add attacker IP to OPNsense shuffle_blocklist alias via API" src="YOUR_IMAGE_URL" />
+
+---
+
+#### Node B — Apply OPNsense Changes
+
+1. Add another **HTTP** node
+2. Connect **Block_IP_OPNsense → Apply_OPNsense**
+3. Rename it `Apply_OPNsense_Changes`
+4. Configure it:
+
+| Field | Value |
+|-------|-------|
+| Action | `POST` |
+| URL | `https://<OPNSENSE_IP>/api/firewall/alias/reconfigure` |
+| Authorization | Same Base64 header as above |
+
+<img width="" height="" alt="HTTP node configured to call OPNsense reconfigure API to apply the blocklist change" src="YOUR_IMAGE_URL" />
+
+---
+
+#### Node C — Discord Block Confirmation
+
+1. Add an **HTTP** node
+2. Connect **Apply_OPNsense_Changes → Discord_Blocked**
+3. Rename it `Discord_Block_Confirmation`
+4. Configure:
+
+| Field | Value |
+|-------|-------|
+| Action | `POST` |
+| URL | `YOUR_DISCORD_WEBHOOK_URL` |
+
+Body:
+
+```json
+{
+  "content": "✅ **IP Successfully Blocked at Firewall**\n\n🌐 **Blocked IP:** $Extract_Attacker_IP.#\n🛡️ **Blocked on:** OPNsense Firewall\n🦠 **VirusTotal Detections:** $VirusTotal_Lookup.#.body.data.attributes.last_analysis_stats.malicious\n👤 **Decision:** Analyst Approved Block\n⏰ **Time:** $exec.text.timestamp"
+}
+```
+
+<img width="" height="" alt="Discord confirmation message node configured to notify analyst of successful IP block" src="YOUR_IMAGE_URL" />
+
+---
+
+### Step 10 — NO Branch: Create TheHive Case
+
+#### Node A — Create TheHive Alert
+
+1. Add a **TheHive** node
+2. Connect **Analyst_Decision (No) → Create_TheHive_Case**
+3. Rename it `Create_TheHive_Case`
+4. Authenticate with your TheHive URL and SOAR service account API key
+5. Set action to **Create Alert**
+6. Switch to **Advanced** tab and paste:
+
+```json
+{
+  "title": "🔍 RDP Brute Force — Under Investigation — $exec.text.agent.name",
+  "description": "## RDP Brute Force Alert\n\n**Attacker IP:** $Extract_Attacker_IP.#\n**Target Host:** $exec.text.agent.name\n**Failed Attempts:** $exec.text.rule.firedtimes\n**VirusTotal Malicious:** $VirusTotal_Lookup.#.body.data.attributes.last_analysis_stats.malicious\n**Country:** $VirusTotal_Lookup.#.body.data.attributes.country\n**ASN:** $VirusTotal_Lookup.#.body.data.attributes.asn\n**Time:** $exec.text.timestamp",
+  "severity": 3,
+  "status": "New",
+  "source": "Wazuh SIEM",
+  "sourceRef": "Rule-100005-$exec.text.timestamp",
+  "tags": ["T1110.001", "rdp-brute-force", "under-investigation", "windows"],
+  "tlp": 2,
+  "pap": 2
+}
+```
+
+<img width="" height="" alt="TheHive node configured with RDP brute force alert JSON in Advanced tab" src="YOUR_IMAGE_URL" />
+
+---
+
+#### Node B — Discord Investigation Notification
+
+1. Add an **HTTP** node
+2. Connect **Create_TheHive_Case → Discord_Flagged**
+3. Rename it `Discord_Flag_Notification`
+4. Configure:
+
+| Field | Value |
+|-------|-------|
+| Action | `POST` |
+| URL | `YOUR_DISCORD_WEBHOOK_URL` |
+
+Body:
+
+```json
+{
+  "content": "🔍 **RDP Brute Force Flagged for Investigation**\n\n🌐 **Attacker IP:** $Extract_Attacker_IP.#\n🖥️ **Target:** $exec.text.agent.name\n🦠 **VirusTotal Detections:** $VirusTotal_Lookup.#.body.data.attributes.last_analysis_stats.malicious\n📋 **TheHive Case:** Created Successfully\n👤 **Decision:** Analyst chose to investigate\n⏰ **Time:** $exec.text.timestamp"
+}
+```
+
+<img width="" height="" alt="Discord flagged notification node configured for the investigation branch" src="YOUR_IMAGE_URL" />
+
+---
+
+### Final Workflow Layout
+
+Once all nodes are connected the complete workflow should look like this:
+
+```
+Wazuh_RDP_Alert (Webhook)
+        ↓
+Extract_Attacker_IP
+        ↓
+VirusTotal_Lookup
+        ↓
+Discord_Alert
+        ↓
+Analyst_Decision (User Input)
+        ↓
+┌────────────┴────────────┐
+YES                       NO
+↓                          ↓
+Block_IP_OPNsense     Create_TheHive_Case
+↓                          ↓
+Apply_OPNsense_Changes Discord_Flag_Notification
+↓
+Discord_Block_Confirmation
+```
+
+<img width="" height="" alt="Complete RDP brute force response workflow in Shuffle showing all nodes connected" src="YOUR_IMAGE_URL" />
+
+---
+
+### Step 11 — End-to-End Test
+
+With the workflow fully built, run a complete end-to-end test:
+
+1. Run Hydra from Kali to trigger the brute force:
+```bash
+hydra -l Administrator -P /usr/share/wordlists/fasttrack.txt rdp://10.0.2.15 -V -t 4
+```
+
+2. Confirm rule **100005** fires in Wazuh dashboard
+3. Confirm Shuffle workflow triggers automatically
+4. Confirm Discord alert arrives in `#soc-alerts`
+5. Click **Yes** in the Shuffle User Input to approve the block
+6. Confirm OPNsense blocks the IP — check **Firewall → Aliases → shuffle_blocklist**
+7. Confirm Discord block confirmation message arrives
+
+<img width="" height="" alt="End-to-end test showing full workflow execution from Hydra attack to Discord block confirmation" src="YOUR_IMAGE_URL" />
+
+> ✅ A successful end-to-end test confirms the full detection and automated
+> response pipeline is operational — from a brute force attack on the Windows
+> machine, through Wazuh detection, Shuffle orchestration, VirusTotal
+> enrichment, analyst approval, all the way to the attacker being blocked
+> at the OPNsense firewall perimeter.
+
+---
+
+<div align="center">
+
+[← Previous: Phase 4 — SOAR Integration](./Phase-4-SOAR.md) &nbsp;&nbsp;&nbsp;&nbsp; [🏠 Back to Main README →](https://github.com/shubhamsharma2107/soc-automation-homelab)
+
+</div>
