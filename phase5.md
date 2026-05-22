@@ -1,4 +1,4 @@
-## Phase 5: RDP Brute Force Attack Simulation & Automated Response
+## Phase 5: RDP Brute Force Simulation & Firewall Automation
 
 ### Scenario Overview
 
@@ -630,7 +630,7 @@ automated block is working:
 
 <div align="center">
 
-[← Previous: Phase 4 — SOAR Integration](./Phase-4-SOAR.md) &nbsp;&nbsp;&nbsp;&nbsp; [🏠 Back to Main README](https://github.com/shubhamsharma2107/soc-automation-homelab)
+[← Previous: Phase 4 — SOAR Integration & Automated Response](./phase4.md) &nbsp;&nbsp;&nbsp;&nbsp; [🏠 Back to Main README](https://github.com/shubhamsharma2107/soc-automation-homelab)
 
 </div>
 
