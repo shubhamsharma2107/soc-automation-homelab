@@ -7,8 +7,8 @@ In this phase we simulate a realistic external attack scenario:
 > An attacker on the internet discovers our WAN IP address, performs reconnaissance
 > using Nmap to identify open ports, finds RDP (port 3389) exposed via port
 > forwarding, and attempts to brute force their way into the Windows 10 machine.
-> Wazuh detects the attack, Shuffle orchestrates the response, and the analyst
-> makes the final decision to block the attacker at the firewall.
+> Wazuh detects the attack, Shuffle orchestrates the response, and the attacker
+> IP gets blocked at the firewall.
 
 The full attack and response pipeline:
 
@@ -25,13 +25,10 @@ Custom Rule 100005 triggers after threshold crossed
         ↓
 Shuffle receives alert → VirusTotal IP lookup
         ↓
-Discord → Analyst YES / NO decision
-        ↓
-    ┌───┴───┐
-   YES      NO
-    ↓        ↓
-OPNsense  TheHive
-IP Block  Case Created
+Discord → Analyst     
+        ↓        
+    OPNsense  
+    IP Block
 ```
 
 ---
@@ -63,7 +60,7 @@ This ensures:
 
 ---
 
-#### 1. Create a NAT Network in VirtualBox
+### 1. Create a NAT Network in VirtualBox
 
 In VirtualBox go to **Tools → Network → NAT Networks → Create** and configure a
 new NAT Network with the `10.0.2.0/24` range:
@@ -72,7 +69,7 @@ new NAT Network with the `10.0.2.0/24` range:
 
 ---
 
-#### 2. Move OPNsense WAN to NAT Network
+### 2. Move OPNsense WAN to NAT Network
 
 In the OPNsense VM settings, change **Adapter 1** from `NAT` to `NAT Network`
 and select the newly created network. VirtualBox will automatically assign an IP
@@ -82,7 +79,7 @@ from the DHCP range:
 
 ---
 
-#### 3. Place Kali on the Same NAT Network
+### 3. Place Kali on the Same NAT Network
 
 In the Kali VM settings, set **Adapter 1** to the same NAT Network. This puts
 Kali on the same segment as OPNsense WAN — simulating an external attacker on
@@ -92,7 +89,7 @@ the internet targeting the firewall perimeter:
 
 ---
 
-#### 4. Verify Network Connectivity
+### 4. Verify Network Connectivity
 
 From the OPNsense dashboard, confirm the WAN interface has picked up an IP in
 the `10.0.2.0/24` range (`10.0.2.15`). Verify connectivity by pinging Kali
@@ -107,7 +104,7 @@ from the OPNsense shell:
 
 ---
 
-#### 5. Enable RDP on Windows 10
+### 5. Enable RDP on Windows 10
 
 On the Windows 10 machine, enable Remote Desktop, allow it through the local
 firewall, and disable Network Level Authentication (NLA) for testing:
@@ -132,7 +129,7 @@ netstat -an | findstr 3389
 
 ---
 
-#### 6. Configure Port Forwarding and Firewall Rules on OPNsense
+### 6. Configure Port Forwarding and Firewall Rules on OPNsense
 
 This step exposes the internal Windows 10 machine's RDP port through the OPNsense firewall, allowing simulated external RDP brute force attacks to reach the target.
 
@@ -153,7 +150,6 @@ Navigate to **Firewall → NAT → Destination NAT** and click **Add** to create
 | Description | `RDP Port Forward → Windows 10` |
 | Firewall Rule | `Manual` |
 
-> [!NOTE]
 > **Why Manual?** Choosing manual rule creation gives you full control over the firewall rule that permits the forwarded traffic — rather than letting OPNsense auto-generate a permissive rule you cannot fine-tune.
 
 Click **Save** then **Apply Changes**.
@@ -189,7 +185,6 @@ Still on the same WAN rule, click **Show Advanced Options** and locate the **Rep
 
 <img width="1563" height="366" alt="image" src="https://github.com/user-attachments/assets/0bacbe9c-14fa-47a5-a2e6-553585984c45" />
 
-> [!IMPORTANT]
 > **Why disable Reply-To?** By default, OPNsense uses Reply-To to force return
 > traffic back through the WAN gateway. In a lab environment with NAT port
 > forwarding, this causes asymmetric routing — response packets take a different
@@ -327,6 +322,7 @@ Wazuh dashboard alongside rule 60204:
 > response. The next step is building the Shuffle workflow to handle the
 > analyst decision and OPNsense block.
 
+---
 
 ### Building the Shuffle Workflow
 
@@ -363,10 +359,6 @@ like this:
 ---
 
 #### Step 3 — Configure Each Node
-
-Three things need to be configured before running the workflow:
-
----
 
 ##### 3a — Activate the Webhook & Connect Wazuh
 
@@ -460,7 +452,7 @@ In Shuffle click **Show Execution Results** on each node and verify:
 
 ---
 
-### Step 7 — Discord Notification Node
+### Step 5 — Discord Notification Node
 
 Add a **Discord** node to send the enriched alert to the analyst:
 
@@ -487,9 +479,9 @@ Click **Test Action** to verify the Discord message is delivered successfully:
 
 ---
 
-### Step 8 — Block IP at OPNsense Firewall
+### Step 6 — Block IP at OPNsense Firewall
 
-#### Create the Blocklist Alias
+#### 6.1 Create the Blocklist Alias
 
 Before configuring the Shuffle node, a dedicated alias needs to be created in
 OPNsense to store the attacker IPs that will be blocked. This alias acts as a
@@ -507,7 +499,7 @@ In OPNsense navigate to **Firewall → Aliases → + Add** and configure:
 
 ---
 
-#### Configure the OPNsense Node in Shuffle
+#### 6.2 Configure the OPNsense Node in Shuffle
 
 The native OPNsense app in Shuffle was not functioning as expected so an
 **HTTP node** is used instead to make direct API calls — the same workaround
@@ -539,7 +531,7 @@ Set the **Body** to:
 
 ---
 
-#### Generate the OPNsense API Key
+#### 6.3 Generate the OPNsense API Key
 
 The OPNsense API requires authentication. To generate an API key:
 
@@ -561,7 +553,7 @@ Open the downloaded file and in the Shuffle HTTP node set:
 
 ---
 
-#### Test & Verify
+#### 6.4 Test & Verify the Block
 
 Save the workflow and click **Test Action** on the OPNsense node. A successful
 response will return a result similar to:
@@ -587,8 +579,58 @@ appear in the list:
 
 ---
 
+### Step 7 — Create the Floating Firewall Block Rule
+
+With the alias in place, the final step is creating a firewall rule that
+actually **drops traffic** from any IP in the `sblocklist` alias.
+
+Navigate to **Firewall → Rules → Floating** and click **Add** to create the rule:
+
+| Field | Value |
+|-------|-------|
+| Action | `Block` |
+| Direction | `in` |
+| Protocol | `any` |
+| Source | `sblocklist` (the alias) |
+| Destination | `any` |
+| Description | `sblocklist drop rule — block IPs added by Shuffle SOAR` |
+
+Click **Save** then **Apply Changes**.
+
+<img width="1791" height="1061" alt="image" src="https://github.com/user-attachments/assets/32389cbc-17ce-4c33-a992-cea362cbf601" />
+
+> **Why a Floating Rule?** Floating rules sit at the top of the rule evaluation
+> order and are processed before interface-specific rules — both manually created
+> and auto-generated ones. This guarantees the block takes effect immediately
+> regardless of other rules in the ruleset, making it the correct choice for a
+> dynamic SOAR-driven blocklist.
+
+---
+
+### Step 8 — End-to-End Verification
+
+With all components in place, run Hydra from Kali one final time to validate
+the full pipeline fires end to end:
+
+```bash
+hydra -l Administrator -P /usr/share/wordlists/fasttrack.txt rdp://10.0.2.15 -V -t 4
+```
+
+The side-by-side view below shows Hydra attempting the brute force on the left
+while OPNsense drops the packets in real time on the right — confirming the
+automated block is working:
+
+<img width="2551" height="1314" alt="image" src="https://github.com/user-attachments/assets/a8a83afc-9042-42ad-bcd4-dc9e98cb6c23" />
+
+> To validate the full pipeline with a fresh IP, change the Kali Linux IP
+> address and rerun the attack — confirming the detection, enrichment,
+> notification, and blocking chain works from start to finish on a new attacker.
+
+---
+
 <div align="center">
 
-[← Previous: Phase 4 — SOAR Integration](./Phase-4-SOAR.md) &nbsp;&nbsp;&nbsp;&nbsp; [🏠 Back to Main README →](https://github.com/shubhamsharma2107/soc-automation-homelab)
+[← Previous: Phase 4 — SOAR Integration](./Phase-4-SOAR.md) &nbsp;&nbsp;&nbsp;&nbsp; [🏠 Back to Main README](https://github.com/shubhamsharma2107/soc-automation-homelab)
 
 </div>
+
