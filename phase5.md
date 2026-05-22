@@ -132,26 +132,75 @@ netstat -an | findstr 3389
 
 ---
 
-#### 6. Create Port Forwarding Rule on OPNsense
+#### 6. Configure Port Forwarding and Firewall Rules on OPNsense
 
-Navigate to **Firewall → NAT → Destination NAT** and create a rule to redirect
-inbound RDP traffic hitting the WAN IP to the Windows 10 machine internally:
+This step exposes the internal Windows 10 machine's RDP port through the OPNsense firewall, allowing simulated external RDP brute force attacks to reach the target.
+
+---
+
+#### 6.1 Create a Destination NAT Rule (Port Forward)
+
+Navigate to **Firewall → NAT → Destination NAT** and click **Add** to create a new rule.
 
 | Field | Value |
 |-------|-------|
 | Interface | `WAN` |
 | Protocol | `TCP` |
 | Destination | `WAN Address` |
-| Destination Port | `3389` |
+| Destination Port Range | `3389` |
 | Redirect Target IP | `10.0.50.100` |
 | Redirect Target Port | `3389` |
 | Description | `RDP Port Forward → Windows 10` |
+| Firewall Rule | `Manual` |
 
-<img width="1295" height="1002" alt="OPNsense Destination NAT rule forwarding WAN port 3389 to Windows 10 at 10.0.50.100" src="https://github.com/user-attachments/assets/cac262d7-adc7-48ed-9dd5-6ab232df18e8" />
+> [!NOTE]
+> **Why Manual?** Choosing manual rule creation gives you full control over the firewall rule that permits the forwarded traffic — rather than letting OPNsense auto-generate a permissive rule you cannot fine-tune.
 
-> Any inbound RDP connection hitting `10.0.2.15:3389` (OPNsense WAN) will now
-> be transparently forwarded to the Windows 10 machine at `10.0.50.100:3389`
-> on the internal LAN.
+Click **Save** then **Apply Changes**.
+
+<img width="1789" height="1055" alt="image" src="https://github.com/user-attachments/assets/9e1712dc-0677-4dd4-994c-8cffdac4ec41" />
+
+---
+
+#### 6.2 Create the WAN Firewall Rule
+
+Navigate to **Firewall → Rules → WAN** and click **Add** to create the matching inbound rule that permits the forwarded RDP traffic.
+
+| Field | Value |
+|-------|-------|
+| Action | `Pass` |
+| Interface | `WAN` |
+| Direction | `in` |
+| Protocol | `TCP` |
+| Source | `any` |
+| Destination | `WAN Address` |
+| Destination Port | `3389` |
+| Description | `Allow inbound RDP to Windows 10 (Port Forward)` |
+
+Click **Save** then **Apply Changes**.
+
+<img width="1790" height="1057" alt="image" src="https://github.com/user-attachments/assets/febc4a1e-7f08-4a32-a3a3-7fb971919e05" />
+
+---
+
+#### 6.3 Disable Reply-To
+
+Still on the same WAN rule, click **Show Advanced Options** and locate the **Reply-To** setting — **disable it**.
+
+<img width="1563" height="366" alt="image" src="https://github.com/user-attachments/assets/0bacbe9c-14fa-47a5-a2e6-553585984c45" />
+
+> [!IMPORTANT]
+> **Why disable Reply-To?** By default, OPNsense uses Reply-To to force return
+> traffic back through the WAN gateway. In a lab environment with NAT port
+> forwarding, this causes asymmetric routing — response packets take a different
+> path than expected, breaking the RDP session. Disabling it ensures return
+> traffic follows the normal routing table instead.
+
+Click **Save** then **Apply Changes**.
+
+> Any inbound RDP connection hitting the OPNsense WAN interface on port `3389`
+> will now be **transparently forwarded** to the Windows 10 machine at
+> `10.0.50.100:3389` on the internal LAN segment.
 
 ---
 
