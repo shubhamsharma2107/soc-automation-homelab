@@ -622,9 +622,40 @@ automated block is working:
 
 <img width="2551" height="1314" alt="image" src="https://github.com/user-attachments/assets/a8a83afc-9042-42ad-bcd4-dc9e98cb6c23" />
 
-> To validate the full pipeline with a fresh IP, change the Kali Linux IP
-> address and rerun the attack — confirming the detection, enrichment,
-> notification, and blocking chain works from start to finish on a new attacker.
+### Final Validation — Full Pipeline Test with Fresh Attacker IP
+
+To confirm the entire pipeline works end to end on a new attacker identity,
+the Kali Linux MAC address was randomized and the VM was restarted — causing
+VirtualBox DHCP to assign a new IP of `10.0.2.4`, simulating a fresh attacker
+coming from a different address.
+
+Hydra was launched again with the same brute force attack:
+
+```bash
+hydra -l Administrator -P /usr/share/wordlists/fasttrack.txt rdp://10.0.2.15 -V -t 4
+```
+
+The result speaks for itself — **the attack never completed.**
+
+<img width="2555" height="1321" alt="image" src="https://github.com/user-attachments/assets/934d7ee1-41c7-4c1f-9de1-d8c50a5f36bb" />
+
+Before Hydra could finish cycling through the wordlist, the full automation
+pipeline had already fired:
+
+- ✅ Wazuh detected the brute force from `10.0.2.4` via rule `100005`
+- ✅ Shuffle extracted the new IP, ran the VirusTotal lookup, and sent the Discord alert
+- ✅ Analyst approved the block
+- ✅ OPNsense API call added `10.0.2.4` to the `sblocklist` alias
+- ✅ Floating firewall rule began dropping all packets from the attacker
+
+The `sblocklist` alias now shows both attacker IPs blocked at the perimeter:
+
+<img width="1262" height="526" alt="image" src="https://github.com/user-attachments/assets/e8e15bfc-8258-4452-b67b-4f7bad18d682" />
+
+> This validates that the pipeline is not a one-time configuration — it works
+> consistently across different attacker IPs without any manual reconfiguration.
+> Every new attacker that crosses the detection threshold gets identified,
+> enriched, reviewed, and blocked automatically.
 
 ---
 
