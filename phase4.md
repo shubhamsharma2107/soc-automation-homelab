@@ -1,4 +1,4 @@
-## Phase 4: SOAR Integration & Automation
+## Phase 4: SOAR Integration & Automated Response
 
 With detection and case management in place, the final phase focuses on **automation and alerting**. We will deploy **Shuffle** as our SOAR (Security Orchestration, Automation and Response) platform to build an automated workflow that:
 
