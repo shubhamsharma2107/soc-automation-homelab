@@ -644,7 +644,6 @@ pipeline had already fired:
 
 - ✅ Wazuh detected the brute force from `10.0.2.4` via rule `100005`
 - ✅ Shuffle extracted the new IP, ran the VirusTotal lookup, and sent the Discord alert
-- ✅ Analyst approved the block
 - ✅ OPNsense API call added `10.0.2.4` to the `sblocklist` alias
 - ✅ Floating firewall rule began dropping all packets from the attacker
 
