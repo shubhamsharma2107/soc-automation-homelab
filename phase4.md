@@ -382,8 +382,8 @@ If everything is configured correctly, within seconds of Mimikatz executing you 
 > 📋 TheHive Case: Created Successfully
 
 ---
-<div align="left">
+<div align="center">
 
-[← Previous: Phase 3 — Mimikatz & Wazuh Detections](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase3.md)
+[← Previous: Phase 3 — Mimikatz & Wazuh Detections](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase3.md) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [Next: Phase 5 — RDP Brute Force Simulation & Firewall Automation →](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase5.md)
 
 </div>
