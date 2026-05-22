@@ -1,4 +1,4 @@
-## Phase 3: Execute Mimikatz & Verify Wazuh Detections
+## Phase 3: Mimikatz Execution & Wazuh Detection
 
 The following steps are performed on the **Windows 10 endpoint**.
 
@@ -104,6 +104,6 @@ If our rule had relied solely on the `Image` field (the file path/name on disk),
 ---
 <div align="center">
 
-[← Previous: Phase 2 — Telemetry, SIEM & Case Management](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase2.md) &nbsp;&nbsp;&nbsp;&nbsp; [Next: Phase 4 — SOAR Integration →](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase4.md)
+[← Previous: Phase 2 — Telemetry, SIEM & Case Management](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase2.md) &nbsp;&nbsp;&nbsp;&nbsp; [Next: Phase 4 — SOAR Integration & Automated Response →](https://github.com/shubhamsharma2107/soc-automation-homelab/blob/main/phase4.md)
 
 </div>
